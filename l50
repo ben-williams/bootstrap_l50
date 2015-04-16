@@ -1,0 +1,59 @@
+---
+title: "Calculate L50"
+author: "Ben Williams"
+date: "Tuesday, March 24, 2015"
+output: html_document
+---
+
+Load file
+
+```{r}
+#FEMALE GKC SAM#
+data <- read.delim("l50_data.txt")
+```
+
+Some of my standard setup for making consistent figures in R. I use ggplot2 for almost all graphics.
+
+```{r,message=FALSE,warning=FALSE}
+#load packages and figure setup
+library(extrafont);library(ggplot2);library(car)
+#font_import() only do this one time - it takes a while
+loadfonts(device="win")
+windowsFonts(Times=windowsFont("TT Times New Roman"))
+theme_set(theme_bw(base_size=12,base_family='Times New Roman')+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
+```
+
+First do a basic plot to be sure data are accurate. I've included a logistic regression smoother that shows confidence intervals.
+
+```{r, warning=FALSE}
+ggplot(data,aes(CL,Mature))+stat_smooth(family='binomial', method='glm')+geom_point()+
+ylab('Ratio Mature')+xlab('Carapace Length (mm)')
+```
+
+Now generate error about l50.  
+First l50 is calculated as $L_{50}=-\alpha/\beta$
+
+Create a function to calculate this value at 50% (or 75%, etc)
+
+```{r}
+lvalue <- function(coef,p) (log(p/(1-p))-coef[1])/coef[2]
+```
+
+Run the model and bootstrap it (using bootCase from the *car* package).
+
+```{r, warning=FALSE}
+fit<-glm(Mature~CL,family=binomial(link=logit),data=data)
+
+bs <- bootCase(fit,B=1000)
+```
+
+Calculate L50
+```{r}
+(l50 <- lvalue(coef(fit),.5))
+```
+
+Calculate 95% L50 confidence intervals
+```{r}
+l50boots <- apply(bs,1,lvalue,p=0.5)
+(l50ci <- quantile(l50boots,c(0.025,0.975)))
+```
